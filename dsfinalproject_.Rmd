@@ -1,0 +1,77 @@
+---
+title: "DSfinalproject"
+author: "Brenda Nava"
+date: "2026-04-09"
+output: html_document
+---
+
+
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)        # Data wrangling
+library(readr)        # Reading semicolon-separated CSV files
+library(ggplot2)      # Visualization
+library(skimr)        # Clean variable summaries
+library(corrplot)     # Correlation heatmap
+library(nnet)         # Multinomial logistic regression
+library(randomForest) # Random forest classification
+library(tidyr)        # Data tidying
+```
+
+
+# Data Preparation: The dataset contains chemical measurements for red and white wines, including acidity, sugar, sulfur dioxide, density, pH, sulphates, alcohol, and a quality score. After combining both datasets, the final dataset contains 6497 rows and 15 columns (I did add the quality_100 column).
+
+```{r}
+
+# semicolon separator
+red <- read_delim("data/winequality-red (1).csv", delim= ";")
+white <- read_delim("data/winequality-white (1).csv", delim= ";")
+
+# wine type
+red$wine_type <- "red"
+white$wine_type <- "white"
+
+#combine datasets
+wine <- bind_rows(red, white)
+
+#convert quality to 100 point scale
+wine <- wine %>%
+  mutate(
+    quality_factor= as.factor(quality),
+    quality_100 = 50 + (quality * 5)
+  )
+
+# Summary of variables
+summary(wine)
+```
+```{r}
+
+head(wine)
+
+```
+
+
+# How do the chemical variables correlate with one another?
+
+```{r}
+numeric_var <- wine %>% select(where(is.numeric))
+cor_matrix <- cor(numeric_var)
+
+
+corrplot(cor_matrix, method = "color", type="upper", tl.col = "black", tl.cex = .7)
+```
+
+
+# Does converting wine quality to a 100‑point scale make the distribution more intuitive?
+```{r}
+ggplot(wine, aes(x=quality_100, fill= wine_type))+
+  geom_histogram(binwidth = 5, color="white")+
+  theme_minimal()+
+  labs(title = "Distribution of wine quality 100 point-scale")
+
+```
+
+
+
+
+
