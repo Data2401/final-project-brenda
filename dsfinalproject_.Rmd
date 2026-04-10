@@ -70,7 +70,9 @@ ggplot(wine, aes(x=quality_100, fill= wine_type))+
   labs(title = "Distribution of wine quality 100 point-scale")
 
 ```
+```{r}
 
+```
 
 
 
