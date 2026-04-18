@@ -23,11 +23,10 @@ The goal of this project is to explore whether wine chemistry can be used to pre
 
 This analysis uses the UCI Wine Quality dataset, which contains chemical laboratory measurements for both red and white wines. Wine quality scores originally range from 0–10, but are converted into a 100-point scale for interpretability. The Wine Spectator scoring system was referenced to guide interpretation of the 100-point scale: https://www.winespectator.com/articles/scoring-scale
 
-
-## Research Questions
+### Research Questions: 
 - How is wine quality distributed, and is it imbalanced?
 - Which chemical features are most associated with wine quality?
-- Can a machine learning model classify wine as “Bad” vs “Good”?
+- Can a Random Forest model classify wine as Bad vs Good?
 - Do red and white wines show distinct chemical patterns?
 - Can wine chemistry predict wine type accurately?
 
