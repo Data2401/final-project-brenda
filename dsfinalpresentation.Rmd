@@ -89,6 +89,8 @@ wine %>%
   count(quality_100)
 ```
 
+
+
 ### Correlation Patterns
 - Residual sugar and density (strong positive correlation)
 - Alcohol and density (strong negative correlation)
@@ -102,6 +104,7 @@ cor_matrix <- cor(numeric_var)
 
 corrplot(cor_matrix, method = "color", type="upper", tl.col = "black", tl.cex = .7)
 ```
+
 
 
 ### Histogram
