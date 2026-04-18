@@ -118,7 +118,7 @@ ggplot(wine, aes(x=quality_100, fill= wine_type))+
   geom_histogram(position= "identity", alpha= 0.6, binwidth = 3)+
   theme_minimal()+
   labs(title = "Quality distribution by wine type",
-       x= "Quality (100 ppint scale)",
+       x= "Quality (100 point scale)",
        y= "Count")
 ```
 Most wines cluster between 50–70 points, and red and white wines overlap heavily. This suggests that wine type alone does not explain quality ratings, and chemical variables must be considered.

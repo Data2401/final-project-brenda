@@ -1,0 +1,337 @@
+---
+title: "Wine and its chemical properties"
+author: "Brenda Nava"
+date: "4/18/2026"
+output: slidy_presentation
+Dataset: "UCI Wine Quality (Red + White)"
+---
+
+```{r setup, echo=FALSE,message=FALSE, warning=FALSE}
+library(dplyr)        # Data wrangling
+library(readr)        # Reading semicolon-separated CSV files
+library(ggplot2)      # Visualization
+library(skimr)        # Clean variable summaries
+library(corrplot)     # Correlation heatmap
+library(nnet)         # Multinomial logistic regression
+library(randomForest) # Random forest classification
+library(tidyr)        # Data tidying
+```
+
+```{r echo=FALSE, message=FALSE}
+# semicolon separator
+red <- read_delim("data/winequality-red (1).csv", delim= ";")
+white <- read_delim("data/winequality-white (1).csv", delim= ";")
+
+# wine type
+red$wine_type <- "red"
+white$wine_type <- "white"
+
+#combine datasets
+wine <- bind_rows(red, white)
+
+#convert quality to 100 point scale
+wine <- wine %>%
+  mutate(
+    quality_100 = quality*10
+    
+  )
+
+```
+
+# Why study wine quality?
+
+> Wine quality matters for producers, distributors, and consumers because it affects pricing and reputation. However, quality is often subjective and expensive to evaluate through expert tasting. This project investigates whether chemical measurements can be used to predict wine quality ratings.
+
+### This project uses the UCI Wine Quality dataset (red + white wines) to explore whether wine chemistry can predict:
+- Wine quality (Bad vs Good)
+- Wine type (Red vs White)
+
+
+### Reference: Wine Spectator 100-point scale: https://www.winespectator.com/articles/scoring-scale
+
+
+---
+
+### Research Questions: 
+- How is wine quality distributed, and is it imbalanced?
+- Which chemical features are most associated with wine quality?
+- Can a Random Forest model classify wine as Bad vs Good?
+- Do red and white wines show distinct chemical patterns?
+- Can wine chemistry predict wine type accurately?
+
+> This project uses exploratory data analysis (EDA) to understand chemical relationships and quality distribution. Then, supervised learning (Random Forest classification) is applied to predict wine quality categories. Finally, unsupervised learning (PCA) is used to examine whether red and white wines naturally form separate chemical clusters.
+
+---
+
+# Dataset Description
+- UCI Wine Quality Dataset
+- Red wine: 1,599 rows
+- White wine: 4,898 rows
+- Combined: 6,497 rows
+- 11 chemical variables
+- Added wine_type label
+- Created quality score: 0–10 (converted to 100-point scale) score for interpretability.
+- No missing values
+
+> Features: fixed acidity, volatile acidity, citric acid, residual sugar, chlorides, sulphates, alcohol, sulfur dioxide, density and pH. Limitations: No grape variety, brand, or vintage year.
+
+---
+
+# Exploratory Data Analysis (EDA)
+
+### Quality Distribution (100-point scale)
+- Most wines fall between 50–70
+- Very few wines are rated above 80
+- Dataset is imbalanced
+
+```{r echo=FALSE}
+wine %>%
+  count(quality_100)
+```
+
+### Correlation Patterns
+- Residual sugar and density (strong positive correlation)
+- Alcohol and density (strong negative correlation)
+
+> Wine chemistry variables are connected, and alcohol appears strongly related to quality.
+
+```{r echo=FALSE}
+numeric_var <- wine %>% select(where(is.numeric))
+cor_matrix <- cor(numeric_var)
+
+
+corrplot(cor_matrix, method = "color", type="upper", tl.col = "black", tl.cex = .7)
+```
+
+
+### Histogram
+
+> Most wines cluster between 50–70 points, and red and white wines overlap heavily. This suggests that wine type alone does not explain quality ratings, and chemical variables must be considered.
+
+```{r echo=FALSE}
+
+ggplot(wine, aes(x=quality_100, fill= wine_type))+
+  geom_histogram(position= "identity", alpha= 0.6, binwidth = 3)+
+  theme_minimal()+
+  labs(title = "Quality distribution by wine type",
+       x= "Quality (100 point scale)",
+       y= "Count")
+
+
+
+
+```
+
+---
+
+# Supervised Random Forest Model 1: Predict wine quality (Bad vs Good)
+
+### Why Binary Categories?
+
+The Wine Spectator scale suggests 80+ is "Good", but very few wines fall into that range. High quality wines are rare in this dataset, so 3-class prediction was unstable.
+
+### To avoid extreme imbalance, quality was grouped into::
+- Bad: quality < 70
+- Good: quality ≥ 70
+
+> The model struggles more with “Good” wines because they are the minority class.
+
+```{r echo=FALSE}
+
+wine <- wine %>%
+  rename_with(~ gsub(" ", "_", .x))
+# target range
+wine <- wine %>%
+  mutate(
+    quality_range = case_when(
+      quality_100 < 70 ~ "Bad",
+      TRUE ~ "Good"
+    ),
+    quality_range= factor(quality_range, levels= c("Bad", "Good")),
+    wine_type= factor(wine_type)
+  )
+table(wine$quality_range)
+
+#drop predictive/leakage data
+model_train_data <- wine %>%
+  select(-quality, -quality_100)
+
+
+# Train test split
+set.seed(123)
+
+train_index <- sample(seq_len(nrow(model_train_data)), size = 0.80*nrow(model_train_data))
+train <- model_train_data[train_index, ]
+test <- model_train_data[-train_index, ]
+
+
+set.seed(123)
+rf_model<- randomForest(
+  quality_range ~ .,
+  data= train,
+  ntree= 300,
+  importance= TRUE
+)
+
+## Model Evaluation
+rf_predictions <- predict(rf_model, newdata = test)
+
+cm <- table(Predicted = rf_predictions, Actual = test$quality_range)
+cm_df <- as.data.frame(cm)
+
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 5) +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Wine Quality Prediction")
+```
+
+### Accuracy is high (~90%):
+- Model predicts Bad wines extremely well
+- Model struggles more predicting Good wines due to imbalance
+
+
+---
+
+```{r echo=FALSE}
+varImpPlot(rf_model, main = "Variable Importance for Wine Quality Classification")
+
+```
+
+- Mean Decrease Accuracy: Drop in accuracy if variable is disturbed; important for prediction.
+
+- Mean Decrease Gini: How much it improves tree splits; separates classes.
+
+```{r echo=FALSE}
+
+ggplot(wine, aes(x = quality_range, y = alcohol, fill = quality_range)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Alcohol Content by Quality Category")
+```
+
+> Alcohol was the strongest predictor of wine quality, followed by volatile acidity and density. This suggests that wine quality ratings are influenced strongly by alcohol content and the balance between acidity and density.
+Interestingly, wine_type had relatively low importance, meaning that red vs white classification alone does not strongly determine whether a wine is rated Good or Bad.
+
+---
+
+# Supervised Random Forest Model 2: Predict wine type (red vs white)
+
+### Now we test whether chemical features can predict wine type.
+
+```{r echo= FALSE}
+#drop predictive/leakage data
+
+winetype_train <- wine %>%
+  select(-quality, -quality_100, -quality_range)
+
+
+## Train/Test Split
+set.seed(123)
+
+train_in <- sample(seq_len(nrow(winetype_train)), size = .8*nrow(winetype_train))
+train_ <- winetype_train[train_in, ]
+test_ <- winetype_train[-train_in, ]
+
+## Random Forest Model
+set.seed(123)
+rf_models <- randomForest(
+  wine_type ~ .,
+  data= train_,
+  ntree= 300,
+  importance= TRUE
+)
+
+## Model Evaluation
+rf_wine_pred <- predict(rf_models, newdata = test_)
+# Confusion matrix as a table
+cm_q <- table(Predicted = rf_wine_pred, Actual = test_$wine_type)
+
+# Convert to data frame for ggplot
+cm_df <- as.data.frame(cm_q)
+
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Confusion Matrix: Wine Type Classification",
+       x = "Actual Wine Type",
+       y = "Predicted Wine Type") +
+  theme_minimal()
+
+
+```
+
+> Wine type was predicted with ~99.5% accuracy, showing red and white wines have distinct chemical profiles.
+
+
+
+### Variable importance for wine type
+```{r echo=FALSE}
+importance_df <- as.data.frame(importance(rf_models))
+importance_df$Feature <- rownames(importance_df)
+
+ggplot(importance_df, aes(x = reorder(Feature, MeanDecreaseGini),
+                          y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Variable Importance for Wine Type Classification",
+       x = "Chemical Property",
+       y = "Mean Decrease Gini") +
+  theme_minimal()
+
+```
+
+> The most important features for distinguishing red and white wines include total sulfur dioxide,  chlorides, and volatile acidity. These results align with real-world expectations, since white wines tend to contain higher sugar and sulfur dioxide levels compared to red wines.
+
+---
+
+
+# Unsupervised Model using Principal Component Analysis (PCA)
+- PCA was performed without wine_type labels
+- Red and white wines still formed separate clusters
+
+> Wine type separation is naturally present in chemistry data.
+
+### What PC1 and PC2 mean: [These new components are weighted mixtures of the original variables]
+- PC1 captures the largest amount of variation in the dataset.
+- PC2 captures the second largest amount of variation, and is independent of PC1.
+
+```{r echo=FALSE}
+wine_scaled <- scale(wine %>% select(where(is.numeric)) %>% select(-quality, -quality_100)) # drops wine type label (string), keeps only numeric values.
+
+pca <- prcomp(wine_scaled)
+
+pca_df <- data.frame(pca$x[,1:2], wine_type = wine$wine_type)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = wine_type)) +
+  geom_point(alpha = 0.4) +
+  theme_minimal() +
+  labs(title = "PCA: Separation of Red vs White Wines")
+
+```
+
+> The PCA visualization shows clear separation between red and white wines in principal component space. This indicates that wine type differences are strongly reflected in chemical measurements, even without using wine type labels in the PCA calculation. This supports the supervised learning result that wine chemistry can reliably distinguish wine type.
+
+---
+
+# Conclusion
+- Wine quality is highly imbalanced (most wines between 50–70)
+- Good wines were harder to classify due to fewer samples
+- Alcohol, volatile acidity, and density are the strongest predictors.
+- Random Forest predicted Bad vs Good with ~90% accuracy
+- Red and white wines show distinct chemical subgroupings.
+- Wine type (red vs white) was predicted extremely well (~99.5%)
+- PCA confirmed strong separation between wine types
+
+## Insights:
+- Chemistry can be used as a low cost tool to estimate quality
+- Wine type classification suggests strong chemical signatures
+
+## Limitations:
+- High-quality wines are rare = imbalance bias
+- 100-point scale is simplified (quality*10 is not perfect)
+
+
+
+
