@@ -95,7 +95,6 @@ wine %>%
 - Residual sugar and density (strong positive correlation)
 - Alcohol and density (strong negative correlation)
 
-> Wine chemistry variables are connected, and alcohol appears strongly related to quality.
 
 ```{r echo=FALSE}
 numeric_var <- wine %>% select(where(is.numeric))
