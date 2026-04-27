@@ -1,5 +1,5 @@
 ---
-title: "DSfinalproject"
+title: "Analyzing UCI wine dataset"
 author: "Brenda Nava"
 date: "2026-04-15"
 output: html_document
